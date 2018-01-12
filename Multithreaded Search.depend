@@ -1,0 +1,6 @@
+# depslib dependency file v1.0
+1515798491 source:d:\documents\codeblocks projects\multithreaded search\main.c
+	<pthread.h>
+	<stdio.h>
+	<string.h>
+
