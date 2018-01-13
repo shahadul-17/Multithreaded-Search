@@ -4,3 +4,9 @@
 	<stdio.h>
 	<string.h>
 
+1515864683 source:d:\documents\github repositories\multithreaded-search\main.c
+	<pthread.h>
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+
