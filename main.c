@@ -4,10 +4,9 @@
 #include <string.h>
 
 #define STRING_LENGTH 50
-#define DICTIONARY_LENGTH 466500
 
-static char query[STRING_LENGTH], dictionary[DICTIONARY_LENGTH][STRING_LENGTH];
-static int tasksCompleted = 0;
+static char query[STRING_LENGTH], **dictionary = NULL;
+static int tasksCompleted = 0, queryLength = 0, dictionaryLength = 0;
 
 static pthread_mutex_t mutex;
 
@@ -16,24 +15,41 @@ struct Argument
     int threadID, startingIndex, lastIndex;
 };
 
-void *taskHandler(void *_argument)
+int countLines(FILE *file)
+{
+    char string[STRING_LENGTH];
+    int lines = 0;
+
+    while (!feof(file))
+    {
+        fscanf(file, "%s", string);
+
+        lines++;
+    }
+
+    rewind(file);
+
+    return lines;
+}
+
+void *taskHandler(void *parameter)
 {
     int i = 0;
-    struct Argument *argument = (struct Argument *)_argument;
+    struct Argument *argument = parameter;
 
-    for (i = argument->startingIndex; i <= argument->lastIndex && i <= DICTIONARY_LENGTH; i++)
+    for (i = argument->startingIndex; i <= argument->lastIndex && i < dictionaryLength; i++)
     {
-        if (strncmp(dictionary[i], query, strlen(query)) == 0)
+        if (strncmp(dictionary[i], query, queryLength) == 0)
         {
             printf("Thread %d: %s\n", argument->threadID, dictionary[i]);
         }
     }
 
-    pthread_mutex_lock(&mutex);
+    pthread_mutex_lock(&mutex);         // locking critical section...
 
     tasksCompleted++;
 
-    pthread_mutex_unlock(&mutex);
+    pthread_mutex_unlock(&mutex);       // unlocking critical section...
 
     return NULL;
 }
@@ -47,24 +63,36 @@ int main()
 
     struct Argument *arguments;
 
-    printf("Enter your query: ");
-    scanf("%s", query);
-
-    printf("Enter the number of threads: ");
-    scanf("%d", &threads);
-    printf("\n");
-
-    perThreadWords = (DICTIONARY_LENGTH / threads) + 1;     // calculating how many words each thread will process...
-    arguments = (struct Argument *)malloc(sizeof(struct Argument) * threads);
-
     if ((file = fopen("dictionary.txt", "r")))      // opening dictionary file as "read-only"...
     {
+        dictionaryLength = countLines(file);        // counting the number of lines...
+        dictionary = malloc(sizeof(char *) * dictionaryLength);     // allocating enough memory for dictionary...
+
+        for (i = 0; i < dictionaryLength; i++)     // allocating memory for words in dictionary...
+        {
+            dictionary[i] = malloc(sizeof(char) * STRING_LENGTH);
+        }
+
+        i = 0;
+
         while (fscanf(file, "%s", dictionary[i]) != EOF)    // loading words from dictionary file...
         {
             i++;
         }
 
         fclose(file);       // releasing resource...
+        printf("dictionary loaded successfully...\n\nwords found: %d\n\n", dictionaryLength);
+        printf("query: ");       // user input prompt...
+        scanf("%s", query);       // taking user input...
+
+        printf("number of threads: ");       // user input prompt...
+        scanf("%d", &threads);       // taking user input...
+        printf("\n");
+
+        queryLength = strlen(query);        // getting query length...
+        perThreadWords = (dictionaryLength / threads) + 1;     // calculating how many words each thread will process...
+        arguments = malloc(sizeof(struct Argument) * threads);
+
         pthread_mutex_init(&mutex, NULL);       // initializing mutex for critical section...
 
         for (i = 0; i < threads; i++)
@@ -73,7 +101,7 @@ int main()
             arguments[i].startingIndex = startingIndex;
             arguments[i].lastIndex = startingIndex + perThreadWords;
 
-            if (pthread_create(&thread, NULL, taskHandler, &arguments[i]) != 0)
+            while (pthread_create(&thread, NULL, taskHandler, &arguments[i]) != 0)      // trying until thread created successfully...
             {
                 printf("error: thread creation failed...\n\n");
             }
@@ -89,14 +117,21 @@ int main()
             }
         }
 
+        // all the cleanups are done here...
         pthread_mutex_destroy(&mutex);       // releasing resource...
+        free(arguments);        // releasing resource...
+
+        for (i = 0; i < dictionaryLength; i++)      // releasing all the words of the dictionary...
+        {
+            free(dictionary[i]);
+        }
+
+        free(dictionary);        // releasing resource...
     }
     else
     {
         printf("error: unable to open the dictionary file...\n\n");
     }
-
-    free(arguments);        // releasing resource...
 
     return 0;
 }
