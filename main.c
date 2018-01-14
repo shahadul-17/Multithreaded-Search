@@ -2,11 +2,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define STRING_LENGTH 50
 
 static char query[STRING_LENGTH], **dictionary = NULL;
 static int tasksCompleted = 0, queryLength = 0, dictionaryLength = 0;
+static double totalTime = 0.0;
 
 static pthread_mutex_t mutex;
 
@@ -35,7 +37,11 @@ int countLines(FILE *file)
 void *taskHandler(void *parameter)
 {
     int i = 0;
+    long time = 0;
+
     struct Argument *argument = parameter;
+
+    time = clock();
 
     for (i = argument->startingIndex; i <= argument->lastIndex && i < dictionaryLength; i++)
     {
@@ -45,8 +51,11 @@ void *taskHandler(void *parameter)
         }
     }
 
+    time = clock() - time;
+
     pthread_mutex_lock(&mutex);         // locking critical section...
 
+    totalTime += (double)time;       // adding time in seconds...
     tasksCompleted++;
 
     pthread_mutex_unlock(&mutex);       // unlocking critical section...
@@ -116,6 +125,8 @@ int main()
                 break;
             }
         }
+
+        printf("\ntime required for searching: %.2lf seconds\n", totalTime / (threads * CLOCKS_PER_SEC));       // basically average time required by multiple threads...
 
         // all the cleanups are done here...
         pthread_mutex_destroy(&mutex);       // releasing resource...
